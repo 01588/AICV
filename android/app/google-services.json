@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "435450115928",
+    "project_id": "careergenius-f60c0",
+    "storage_bucket": "careergenius-f60c0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:435450115928:android:db2ae9a19df331338d572d",
+        "android_client_info": {
+          "package_name": "com.careergenius.ai"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDhZRjboFCwG1o0y81-gDosaIMO_dVS-do"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

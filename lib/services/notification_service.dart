@@ -30,17 +30,17 @@ class NotificationService {
       // Initialize timezone data
       tz.initializeTimeZones();
 
-      // Android initialization
-      const AndroidInitializationSettings androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+      // Android initialization - Fixed const issue
+      const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
 
-      // iOS initialization
-      const DarwinInitializationSettings iosSettings = DarwinInitializationSettings(
+      // iOS initialization - Fixed const issue
+      const iosSettings = DarwinInitializationSettings(
         requestAlertPermission: false,
         requestBadgePermission: false,
         requestSoundPermission: false,
       );
 
-      const InitializationSettings initSettings = InitializationSettings(
+      const initSettings = InitializationSettings(
         android: androidSettings,
         iOS: iosSettings,
       );
@@ -121,7 +121,7 @@ class NotificationService {
         interruptionLevel: InterruptionLevel.active,
       );
 
-      const details = NotificationDetails(
+      var details = NotificationDetails(
         android: androidDetails,
         iOS: iosDetails,
       );
@@ -174,7 +174,7 @@ class NotificationService {
         interruptionLevel: InterruptionLevel.active,
       );
 
-      const details = NotificationDetails(
+      var details = NotificationDetails(
         android: androidDetails,
         iOS: iosDetails,
       );
@@ -185,8 +185,8 @@ class NotificationService {
         body,
         tzScheduledTime,
         details,
-        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-        payload: payload, androidScheduleMode: null,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle, // Fixed missing parameter
+        payload: payload,
       );
     } catch (e) {
       if (kDebugMode) {
@@ -227,7 +227,7 @@ class NotificationService {
         interruptionLevel: InterruptionLevel.active,
       );
 
-      const details = NotificationDetails(
+      var details = NotificationDetails(
         android: androidDetails,
         iOS: iosDetails,
       );
@@ -239,6 +239,7 @@ class NotificationService {
         repeatInterval,
         details,
         payload: payload,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle, // Fixed missing parameter
       );
     } catch (e) {
       if (kDebugMode) {
@@ -411,17 +412,17 @@ class NotificationService {
   Color? _getNotificationColor(NotificationType type) {
     switch (type) {
       case NotificationType.reminder:
-        return Color(0xFF3B82F6); // Blue
+        return const Color(0xFF3B82F6); // Blue
       case NotificationType.achievement:
-        return Color(0xFFF59E0B); // Amber
+        return const Color(0xFFF59E0B); // Amber
       case NotificationType.subscription:
-        return Color(0xFF8B5CF6); // Purple
+        return const Color(0xFF8B5CF6); // Purple
       case NotificationType.interview:
-        return Color(0xFF10B981); // Green
+        return const Color(0xFF10B981); // Green
       case NotificationType.resume:
-        return Color(0xFF1E3A8A); // Dark blue
+        return const Color(0xFF1E3A8A); // Dark blue
       case NotificationType.general:
-        return Color(0xFF6B7280); // Gray
+        return const Color(0xFF6B7280); // Gray
     }
   }
 

@@ -89,7 +89,7 @@ dependencies:
   # Audio & Speech
   speech_to_text: ^7.0.0
   flutter_tts: ^4.1.0
-  record: ^5.1.3
+#  record: ^5.1.3
   just_audio: ^0.9.42
 
   # Date & Time
@@ -143,7 +143,7 @@ dependencies:
   # Code Generation
   freezed_annotation: ^2.4.4
   timezone: ^0.10.1
-  flutter_local_notifications: ^19.3.0
+  flutter_local_notifications: any
 
 dev_dependencies:
   flutter_test:
@@ -177,36 +177,36 @@ flutter:
   uses-material-design: true
 
   # To add assets to your application, add an assets section, like this:
-  assets:
-    # Images
-    - assets/images/
-    - assets/images/logos/
-    - assets/images/templates/
-    - assets/images/onboarding/
-    - assets/images/placeholders/
-
-    # Animations
-    - assets/animations/
-    - assets/animations/lottie/
-
-    # Icons
-    - assets/icons/
-    - assets/icons/categories/
-    - assets/icons/social/
-
-    # Templates
-    - assets/templates/
-    - assets/templates/resume/
-    - assets/templates/cover_letter/
-
-    # Sample Data
-    - assets/data/
-    - assets/data/sample_questions.json
-    - assets/data/industries.json
-    - assets/data/skills.json
-
-    # Localization
-    - assets/translations/
+#  assets:
+#    # Images
+#    - assets/images/
+#    - assets/images/logos/
+#    - assets/images/templates/
+#    - assets/images/onboarding/
+#    - assets/images/placeholders/
+#
+#    # Animations
+#    - assets/animations/
+#    - assets/animations/lottie/
+#
+#    # Icons
+#    - assets/icons/
+#    - assets/icons/categories/
+#    - assets/icons/social/
+#
+#    # Templates
+#    - assets/templates/
+#    - assets/templates/resume/
+#    - assets/templates/cover_letter/
+#
+#    # Sample Data
+#    - assets/data/
+#    - assets/data/sample_questions.json
+#    - assets/data/industries.json
+#    - assets/data/skills.json
+#
+#    # Localization
+#    - assets/translations/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
@@ -219,26 +219,26 @@ flutter:
   # "family" key with the font family name, and a "fonts" key with a
   # list giving the asset and other descriptors for the font. For
   # example:
-  fonts:
-    - family: Poppins
-      fonts:
-        - asset: assets/fonts/Poppins-Regular.ttf
-        - asset: assets/fonts/Poppins-Medium.ttf
-          weight: 500
-        - asset: assets/fonts/Poppins-SemiBold.ttf
-          weight: 600
-        - asset: assets/fonts/Poppins-Bold.ttf
-          weight: 700
-
-    - family: Inter
-      fonts:
-        - asset: assets/fonts/Inter-Regular.ttf
-        - asset: assets/fonts/Inter-Medium.ttf
-          weight: 500
-        - asset: assets/fonts/Inter-SemiBold.ttf
-          weight: 600
-        - asset: assets/fonts/Inter-Bold.ttf
-          weight: 700
+#  fonts:
+#    - family: Poppins
+#      fonts:
+#        - asset: assets/fonts/Poppins-Regular.ttf
+#        - asset: assets/fonts/Poppins-Medium.ttf
+#          weight: 500
+#        - asset: assets/fonts/Poppins-SemiBold.ttf
+#          weight: 600
+#        - asset: assets/fonts/Poppins-Bold.ttf
+#          weight: 700
+#
+#    - family: Inter
+#      fonts:
+#        - asset: assets/fonts/Inter-Regular.ttf
+#        - asset: assets/fonts/Inter-Medium.ttf
+#          weight: 500
+#        - asset: assets/fonts/Inter-SemiBold.ttf
+#          weight: 600
+#        - asset: assets/fonts/Inter-Bold.ttf
+#          weight: 700
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package

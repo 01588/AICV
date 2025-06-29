@@ -30,6 +30,7 @@ class InterviewQuestion {
   final DifficultyLevel difficulty;
   final String category;
   final List<String> keywords;
+  final List<String> keyPoints; // Added missing property
   final String? tips;
   final int estimatedTimeMinutes;
 
@@ -40,6 +41,7 @@ class InterviewQuestion {
     required this.difficulty,
     required this.category,
     required this.keywords,
+    required this.keyPoints, // Added required parameter
     this.tips,
     required this.estimatedTimeMinutes,
   });
@@ -56,6 +58,7 @@ class InterviewQuestion {
       ),
       category: json['category'] as String,
       keywords: List<String>.from(json['keywords'] as List),
+      keyPoints: List<String>.from(json['keyPoints'] as List? ?? []), // Added parsing
       tips: json['tips'] as String?,
       estimatedTimeMinutes: json['estimatedTimeMinutes'] as int,
     );
@@ -69,6 +72,7 @@ class InterviewQuestion {
       'difficulty': difficulty.toString().split('.').last,
       'category': category,
       'keywords': keywords,
+      'keyPoints': keyPoints, // Added to JSON
       'tips': tips,
       'estimatedTimeMinutes': estimatedTimeMinutes,
     };
@@ -81,6 +85,7 @@ class InterviewQuestion {
     DifficultyLevel? difficulty,
     String? category,
     List<String>? keywords,
+    List<String>? keyPoints, // Added parameter
     String? tips,
     int? estimatedTimeMinutes,
   }) {
@@ -91,6 +96,7 @@ class InterviewQuestion {
       difficulty: difficulty ?? this.difficulty,
       category: category ?? this.category,
       keywords: keywords ?? this.keywords,
+      keyPoints: keyPoints ?? this.keyPoints, // Added parameter
       tips: tips ?? this.tips,
       estimatedTimeMinutes: estimatedTimeMinutes ?? this.estimatedTimeMinutes,
     );
@@ -163,6 +169,22 @@ class InterviewFeedback {
     required this.suggestions,
     required this.createdAt,
   });
+
+  // Added static empty method - Fixed parameter issue
+  static InterviewFeedback empty(String questionId) {
+    return InterviewFeedback(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      questionId: questionId,
+      overallScore: 0.0,
+      relevanceScore: 0.0,
+      clarityScore: 0.0,
+      completenessScore: 0.0,
+      strengths: 'Unable to analyze answer at this time',
+      areasForImprovement: 'Please try again later',
+      suggestions: ['Retry the evaluation'],
+      createdAt: DateTime.now(),
+    );
+  }
 
   factory InterviewFeedback.fromJson(Map<String, dynamic> json) {
     return InterviewFeedback(

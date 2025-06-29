@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/services/analytics_service.dart';
 import '../../../core/utils/exceptions.dart';
+import '../../../services/analytics_service.dart';
 import '../../home/screens/main_navigation.dart';
 import '../widgets/social_login_button.dart';
 import 'signup_screen.dart';

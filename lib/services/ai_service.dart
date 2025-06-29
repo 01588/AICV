@@ -3,9 +3,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import '../../features/interview/models/interview_models.dart';
-import '../utils/logger.dart';
-import '../utils/exceptions.dart';
+import '../core/utils/exceptions.dart';
+import '../core/utils/logger.dart';
+import '../features/interview/models/interview_models.dart';
+
 
 class AIService {
   static final AIService _instance = AIService._internal();

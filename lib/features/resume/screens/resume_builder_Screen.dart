@@ -1,127 +1,67 @@
+// lib/features/resume/screens/resume_builder_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter/services.dart';
+import '../../../core/widgets/custom_app_bar.dart';
 
-import '../../../core/theme/app_colors.dart';
-
-import '../../../core/widgets/custom_widgets.dart';
 import '../providers/resume_provider.dart';
-import '../models/resume_model.dart';
+import '../widgets/resume_form_sections.dart';
 
+import 'resume_preview_screen.dart';
 
 class ResumeBuilderScreen extends StatefulWidget {
-  final ResumeModel? existingResume;
-
-  const ResumeBuilderScreen({
-    Key? key,
-    this.existingResume,
-  }) : super(key: key);
+  const ResumeBuilderScreen({Key? key}) : super(key: key);
 
   @override
   State<ResumeBuilderScreen> createState() => _ResumeBuilderScreenState();
 }
 
-class _ResumeBuilderScreenState extends State<ResumeBuilderScreen>
-    with TickerProviderStateMixin {
-  late PageController _pageController;
-  late AnimationController _stepAnimationController;
-  late Animation<double> _progressAnimation;
-
-  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+class _ResumeBuilderScreenState extends State<ResumeBuilderScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final PageController _pageController = PageController();
   int _currentStep = 0;
+  final int _totalSteps = 5;
 
-  final List<ResumeStep> _steps = [
-    ResumeStep(
-      title: 'Personal Info',
-      icon: Icons.person_outline,
-      description: 'Basic information and contact details',
-    ),
-    ResumeStep(
-      title: 'Professional',
-      icon: Icons.work_outline,
-      description: 'Work experience and achievements',
-    ),
-    ResumeStep(
-      title: 'Skills',
-      icon: Icons.star_outline,
-      description: 'Technical and soft skills',
-    ),
-    ResumeStep(
-      title: 'Education',
-      icon: Icons.school_outlined,
-      description: 'Academic background and certifications',
-    ),
-    ResumeStep(
-      title: 'Template',
-      icon: Icons.design_services_outlined,
-      description: 'Choose your resume design',
-    ),
-    ResumeStep(
-      title: 'Review',
-      icon: Icons.preview_outlined,
-      description: 'Final review and AI optimization',
-    ),
+  // Step titles
+  final List<String> _stepTitles = [
+    'Personal Info',
+    'Professional Info',
+    'Skills',
+    'Education',
+    'Template',
   ];
 
   @override
   void initState() {
     super.initState();
-    _pageController = PageController();
-    _stepAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 300),
-      vsync: this,
-    );
-    _progressAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _stepAnimationController,
-      curve: Curves.easeInOut,
-    ));
-
-    // Initialize with existing resume if provided
-    if (widget.existingResume != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        context.read<ResumeProvider>().loadExistingResume(widget.existingResume!);
-      });
-    }
+    _loadInitialData();
   }
 
   @override
   void dispose() {
     _pageController.dispose();
-    _stepAnimationController.dispose();
     super.dispose();
   }
 
-  void _nextStep() async {
+  void _loadInitialData() {
     final resumeProvider = context.read<ResumeProvider>();
+    resumeProvider.loadTemplates();
+    resumeProvider.loadDraft();
+  }
 
-    // Validate current step
-    if (!_validateCurrentStep()) {
-      return;
-    }
-
-    // Show AI suggestions before moving to next step
-    if (_currentStep < 3) {
-      await _showAISuggestions();
-    }
-
-    if (_currentStep < _steps.length - 1) {
-      setState(() {
-        _currentStep++;
-      });
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-      _updateProgress();
-
-      // Trigger haptic feedback
-      HapticFeedback.lightImpact();
+  void _nextStep() {
+    if (_currentStep < _totalSteps - 1) {
+      if (_validateCurrentStep()) {
+        setState(() {
+          _currentStep++;
+        });
+        _pageController.nextPage(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+        _saveDraft();
+      }
     } else {
-      // Generate and preview resume
-      await _generateResume();
+      _generateResume();
     }
   }
 
@@ -134,14 +74,7 @@ class _ResumeBuilderScreenState extends State<ResumeBuilderScreen>
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
       );
-      _updateProgress();
-      HapticFeedback.lightImpact();
     }
-  }
-
-  void _updateProgress() {
-    final progress = (_currentStep + 1) / _steps.length;
-    _stepAnimationController.animateTo(progress);
   }
 
   bool _validateCurrentStep() {
@@ -163,322 +96,244 @@ class _ResumeBuilderScreenState extends State<ResumeBuilderScreen>
     }
   }
 
-  Future<void> _showAISuggestions() async {
+  void _saveDraft() {
     final resumeProvider = context.read<ResumeProvider>();
-    final suggestions = await resumeProvider.generateAISuggestions(_currentStep);
-
-    if (suggestions.isNotEmpty && mounted) {
-      showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (context) => AISuggestionsBottomSheet(
-          suggestions: suggestions,
-          onApplySuggestion: (suggestion) {
-            resumeProvider.applySuggestion(suggestion);
-            Navigator.pop(context);
-          },
-        ),
-      );
-    }
+    resumeProvider.saveDraft();
   }
 
-  Future<void> _generateResume() async {
+  void _generateResume() async {
     final resumeProvider = context.read<ResumeProvider>();
 
-    try {
-      await resumeProvider.generateResume();
+    if (_formKey.currentState?.validate() ?? false) {
+      final resume = await resumeProvider.generateResume();
 
-      if (mounted) {
+      if (resume != null && mounted) {
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => ResumePreviewScreen(
-              resume: resumeProvider.currentResume!,
+              resumeData: resumeProvider.buildResumeModel(),
+              templateId: resumeProvider.selectedTemplate ?? 'modern',
             ),
           ),
         );
       }
-    } catch (e) {
-      _showErrorDialog('Failed to generate resume. Please try again.');
     }
-  }
-
-  void _showErrorDialog(String message) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Error'),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBodyBehindAppBar: true,
       appBar: CustomAppBar(
-        title: 'AI Resume Builder',
-        showBackButton: true,
+        title: 'Resume Builder',
         actions: [
-          Consumer<ResumeProvider>(
-            builder: (context, provider, child) {
-              return IconButton(
-                icon: const Icon(Icons.save_outlined),
-                onPressed: provider.isLoading ? null : () => provider.saveDraft(),
-                tooltip: 'Save Draft',
-              );
-            },
+          TextButton(
+            onPressed: _saveDraft,
+            child: const Text('Save Draft'),
           ),
         ],
       ),
-      body: GradientBackground(
-        child: SafeArea(
-          child: Column(
-            children: [
-              // Progress Header
-              _buildProgressHeader(),
+      body: Consumer<ResumeProvider>(
+        builder: (context, resumeProvider, child) {
+          if (resumeProvider.isLoading) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
 
-              // Content
-              Expanded(
-                child: Consumer<ResumeProvider>(
-                  builder: (context, provider, child) {
-                    if (provider.isLoading) {
-                      return const Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            CircularProgressIndicator(),
-                            SizedBox(height: 16),
-                            Text('AI is working on your resume...'),
-                          ],
-                        ),
-                      );
-                    }
-
-                    return Form(
-                      key: _formKey,
-                      child: PageView(
-                        controller: _pageController,
-                        physics: const NeverScrollableScrollPhysics(),
-                        children: [
-                          PersonalInfoFormSection(
-                            initialData: provider.personalInfo,
-                            onChanged: provider.updatePersonalInfo,
-                          ),
-                          ProfessionalInfoFormSection(
-                            initialData: provider.professionalInfo,
-                            onChanged: provider.updateProfessionalInfo,
-                          ),
-                          SkillsFormSection(
-                            initialData: provider.skills,
-                            onChanged: provider.updateSkills,
-                          ),
-                          EducationFormSection(
-                            initialData: provider.education,
-                            onChanged: provider.updateEducation,
-                          ),
-                          TemplateSelector(
-                            selectedTemplate: provider.selectedTemplate,
-                            onTemplateSelected: provider.updateTemplate,
-                          ),
-                          ResumeReviewSection(
-                            resume: provider.buildResumeModel(),
-                          ),
-                        ],
+          return Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                // Progress indicator
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      StepIndicator(
+                        currentStep: _currentStep,
+                        totalSteps: _totalSteps,
                       ),
-                    );
-                  },
+                      const SizedBox(height: 8),
+                      Text(
+                        _stepTitles[_currentStep],
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
 
-              // Navigation Footer
-              _buildNavigationFooter(),
-            ],
-          ),
-        ),
+                // Form content
+                Expanded(
+                  child: PageView(
+                    controller: _pageController,
+                    physics: const NeverScrollableScrollPhysics(),
+                    children: [
+                      _buildPersonalInfoStep(resumeProvider),
+                      _buildProfessionalInfoStep(resumeProvider),
+                      _buildSkillsStep(resumeProvider),
+                      _buildEducationStep(resumeProvider),
+                      _buildTemplateStep(resumeProvider),
+                    ],
+                  ),
+                ),
+
+                // Navigation buttons
+                _buildNavigationButtons(resumeProvider),
+              ],
+            ),
+          );
+        },
       ),
-      floatingActionButton: _buildFloatingActionButton(),
     );
   }
 
-  Widget _buildProgressHeader() {
-    return Container(
-      padding: const EdgeInsets.all(20),
+  Widget _buildPersonalInfoStep(ResumeProvider resumeProvider) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: PersonalInfoFormSection(
+        data: resumeProvider.personalInfo,
+        onChanged: (key, value) {
+          final updatedInfo = Map<String, dynamic>.from(resumeProvider.personalInfo);
+          updatedInfo[key] = value;
+          resumeProvider.updatePersonalInfo(updatedInfo);
+        },
+      ),
+    );
+  }
+
+  Widget _buildProfessionalInfoStep(ResumeProvider resumeProvider) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          // Step indicator
-          StepIndicator(
-            currentStep: _currentStep,
-            totalSteps: _steps.length,
-            stepTitles: _steps.map((step) => step.title).toList(),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Progress bar
-          AnimatedBuilder(
-            animation: _progressAnimation,
-            builder: (context, child) {
-              return LinearProgressIndicator(
-                value: _progressAnimation.value,
-                backgroundColor: Colors.white.withOpacity(0.3),
-                valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-                minHeight: 6,
-              );
+          ProfessionalInfoFormSection(
+            data: resumeProvider.professionalInfo,
+            onChanged: (key, value) {
+              final updatedInfo = Map<String, dynamic>.from(resumeProvider.professionalInfo);
+              updatedInfo[key] = value;
+              resumeProvider.updateProfessionalInfo(updatedInfo);
             },
           ),
-
-          const SizedBox(height: 12),
-
-          // Current step info
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  _steps[_currentStep].icon,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _steps[_currentStep].title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    Text(
-                      _steps[_currentStep].description,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.white70,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          const SizedBox(height: 24),
+          AIWritingAssistant(
+            onSuggestionApplied: (suggestion) {
+              final updatedInfo = Map<String, dynamic>.from(resumeProvider.professionalInfo);
+              updatedInfo['aiSuggestion'] = suggestion;
+              resumeProvider.updateProfessionalInfo(updatedInfo);
+            },
           ),
         ],
       ),
     );
   }
 
-  Widget _buildNavigationFooter() {
+  Widget _buildSkillsStep(ResumeProvider resumeProvider) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: SkillsFormSection(
+        data: {'skills': resumeProvider.skills},
+        onChanged: (key, value) {
+          if (key == 'skills' && value is List<String>) {
+            resumeProvider.updateSkills(value);
+          }
+        },
+      ),
+    );
+  }
+
+  Widget _buildEducationStep(ResumeProvider resumeProvider) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: EducationFormSection(
+        data: resumeProvider.education,
+        onChanged: (key, value) {
+          final updatedInfo = Map<String, dynamic>.from(resumeProvider.education);
+          updatedInfo[key] = value;
+          resumeProvider.updateEducation(updatedInfo);
+        },
+      ),
+    );
+  }
+
+  Widget _buildTemplateStep(ResumeProvider resumeProvider) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: TemplateSelector(
+        templates: resumeProvider.templates.map((template) => {
+          'id': template.id,
+          'name': template.name,
+          'isPremium': template.isPremium,
+          'category': template.category.toString().split('.').last,
+        }).toList(),
+        selectedTemplateId: resumeProvider.selectedTemplate,
+        onTemplateSelected: (templateId) {
+          resumeProvider.updateTemplate(templateId);
+        },
+      ),
+    );
+  }
+
+  Widget _buildNavigationButtons(ResumeProvider resumeProvider) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 4,
             offset: const Offset(0, -2),
           ),
         ],
       ),
-      child: SafeArea(
-        child: Row(
-          children: [
-            if (_currentStep > 0)
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _previousStep,
-                  icon: const Icon(Icons.arrow_back),
-                  label: const Text('Previous'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                ),
-              ),
-
-            if (_currentStep > 0) const SizedBox(width: 16),
-
+      child: Row(
+        children: [
+          if (_currentStep > 0) ...[
             Expanded(
-              flex: _currentStep == 0 ? 1 : 1,
-              child: Consumer<ResumeProvider>(
-                builder: (context, provider, child) {
-                  return ElevatedButton.icon(
-                    onPressed: provider.isLoading ? null : _nextStep,
-                    icon: Icon(
-                      _currentStep < _steps.length - 1
-                          ? Icons.arrow_forward
-                          : Icons.auto_awesome,
-                    ),
-                    label: Text(
-                      _currentStep < _steps.length - 1
-                          ? 'Continue'
-                          : 'Generate Resume',
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      backgroundColor: AppColors.primaryBlue,
-                    ),
-                  );
-                },
+              child: OutlinedButton(
+                onPressed: _previousStep,
+                child: const Text('Previous'),
               ),
             ),
+            const SizedBox(width: 16),
           ],
-        ),
+          Expanded(
+            flex: _currentStep > 0 ? 1 : 2,
+            child: ElevatedButton(
+              onPressed: resumeProvider.isLoading ? null : _nextStep,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).primaryColor,
+                foregroundColor: Colors.white,
+              ),
+              child: resumeProvider.isLoading
+                  ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
+              )
+                  : Text(
+                _currentStep < _totalSteps - 1 ? 'Next' : 'Generate Resume',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
-
-  Widget? _buildFloatingActionButton() {
-    if (_currentStep >= 4) return null;
-
-    return FloatingActionButton.extended(
-      onPressed: () => _showAIAssistant(),
-      icon: const Icon(Icons.psychology),
-      label: const Text('AI Help'),
-      backgroundColor: AppColors.purple,
-    );
-  }
-
-  void _showAIAssistant() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => const AIWritingAssistant(),
-    );
-  }
 }
 
-class ResumeStep {
-  final String title;
-  final IconData icon;
-  final String description;
-
-  const ResumeStep({
-    required this.title,
-    required this.icon,
-    required this.description,
-  });
-}
-
+// AI Suggestions Bottom Sheet
 class AISuggestionsBottomSheet extends StatelessWidget {
-  final List<AISuggestion> suggestions;
-  final Function(AISuggestion) onApplySuggestion;
+  final List<Map<String, dynamic>> suggestions;
+  final Function(Map<String, dynamic>) onApplySuggestion;
 
   const AISuggestionsBottomSheet({
     Key? key,
@@ -489,253 +344,38 @@ class AISuggestionsBottomSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.7,
+      padding: const EdgeInsets.all(16),
       decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(20),
-        ),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Column(
-        children: [
-          // Handle
-          Container(
-            width: 40,
-            height: 4,
-            margin: const EdgeInsets.symmetric(vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.grey[300],
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-
-          // Header
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: [
-                const Icon(Icons.auto_awesome, color: AppColors.purple),
-                const SizedBox(width: 12),
-                const Text(
-                  'AI Suggestions',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const Spacer(),
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close),
-                ),
-              ],
-            ),
-          ),
-
-          const Divider(),
-
-          // Suggestions list
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              itemCount: suggestions.length,
-              itemBuilder: (context, index) {
-                final suggestion = suggestions[index];
-                return AISuggestionCard(
-                  suggestion: suggestion,
-                  onApply: () => onApplySuggestion(suggestion),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class ResumeReviewSection extends StatelessWidget {
-  final ResumeModel resume;
-
-  const ResumeReviewSection({
-    Key? key,
-    required this.resume,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ATS Score Card
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: AppColors.successGradient,
-              ),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              children: [
-                const Icon(
-                  Icons.verified,
-                  color: Colors.white,
-                  size: 48,
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'ATS Compatibility Score',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${resume.atsScore}%',
-                  style: const TextStyle(
-                    fontSize: 36,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Excellent! Your resume is highly optimized for ATS systems.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
+          const Text(
+            'AI Suggestions',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
             ),
           ),
-
-          const SizedBox(height: 24),
-
-          // Resume Summary
-          _buildSummaryCard(
-            'Resume Summary',
-            Icons.description,
-            [
-              'Template: ${resume.template?.name ?? 'Modern'}',
-              'Sections: ${resume.sections.length}',
-              'Keywords: ${resume.keywords.length}',
-              'Estimated reading time: 30 seconds',
-            ],
-          ),
-
           const SizedBox(height: 16),
-
-          // Optimization Tips
-          _buildSummaryCard(
-            'AI Optimization',
-            Icons.auto_awesome,
-            [
-              'Keywords strategically placed for ATS scanning',
-              'Action verbs used to highlight achievements',
-              'Quantified results included where possible',
-              'Industry-specific terminology incorporated',
-            ],
-          ),
-
-          const SizedBox(height: 16),
-
-          // Quick Actions
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _shareResume(context),
-                  icon: const Icon(Icons.share),
-                  label: const Text('Share'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () => _downloadResume(context),
-                  icon: const Icon(Icons.download),
-                  label: const Text('Download'),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSummaryCard(String title, IconData icon, List<String> items) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: AppColors.primaryBlue),
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ...items.map((item) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 6,
-                  height: 6,
-                  margin: const EdgeInsets.only(top: 6, right: 8),
-                  decoration: const BoxDecoration(
-                    color: AppColors.primaryBlue,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                Expanded(
-                  child: Text(
-                    item,
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                ),
-              ],
-            ),
+          ...suggestions.map((suggestion) => AISuggestionCard(
+            title: suggestion['title'] ?? 'Suggestion',
+            description: suggestion['description'] ?? '',
+            suggestion: suggestion['content'] ?? '',
+            confidence: (suggestion['confidence'] ?? 0.8) as double,
+            onApply: () {
+              onApplySuggestion(suggestion);
+              Navigator.pop(context);
+            },
+            onDismiss: () {
+              Navigator.pop(context);
+            },
           )).toList(),
         ],
       ),
-    );
-  }
-
-  void _shareResume(BuildContext context) {
-    // Implement share functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Share functionality coming soon!')),
-    );
-  }
-
-  void _downloadResume(BuildContext context) {
-    // Implement download functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Resume will be downloaded!')),
     );
   }
 }

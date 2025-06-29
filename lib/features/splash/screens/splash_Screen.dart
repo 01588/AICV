@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/services/analytics_service.dart';
+import '../../../services/analytics_service.dart';
 import '../../onboarding/screens/onboarding_screen.dart';
- import '../../auth/screens/login_screen.dart';
+import '../../auth/screens/login_screen.dart';
 import '../../home/screens/main_navigation.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -51,7 +52,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   void _checkAuthStatus() async {
     final authProvider = context.read<AuthProvider>();
-    final analyticsService = context.read<AnalyticsService>();
+    final analyticsService = context.read<AnalyticsService>(); // Fixed: removed .instance
 
     // Wait for minimum splash time
     await Future.delayed(const Duration(seconds: 2));

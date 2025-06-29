@@ -1,103 +1,91 @@
+// lib/features/resume/providers/resume_provider.dart
 import 'package:flutter/foundation.dart';
-import 'package:uuid/uuid.dart';
-
-import '../../../core/services/ai_service.dart';
-
-import '../models/resume_model.dart';
+import '../../../core/services/analytics_service.dart';
+import '../../../core/services/storage_service.dart';
+import '../../../core/services/api_service.dart';
+import '../../../core/utils/exceptions.dart';
+import '../../../services/analytics_service.dart';
+import '../../../services/api_service.dart';
+import '../../../services/storage_service.dart';
+import '../models/template_model.dart';
 
 class ResumeProvider extends ChangeNotifier {
-  final AIService _aiService = AIService.instance;
-  final StorageService _storageService = StorageService.instance;
+  final AnalyticsService _analyticsService;
+  final StorageService _storageService;
+  final ApiService _apiService;
 
-  // Current resume being built
-  ResumeModel? _currentResume;
-
-  // Form data
-  PersonalInfo _personalInfo = PersonalInfo.empty();
-  ProfessionalInfo _professionalInfo = ProfessionalInfo.empty();
-  List<Skill> _skills = [];
-  List<Education> _education = [];
-  ResumeTemplate? _selectedTemplate;
-
-  // State
+  List<Resume> _resumes = [];
+  List<ResumeTemplate> _templates = [];
+  Resume? _currentResume;
   bool _isLoading = false;
-  String? _errorMessage;
-  List<ResumeModel> _savedResumes = [];
-  List<AISuggestion> _currentSuggestions = [];
+  String? _error;
+
+  // Resume data for building
+  Map<String, dynamic> _personalInfo = {};
+  Map<String, dynamic> _professionalInfo = {};
+  Map<String, dynamic> _education = {};
+  List<String> _skills = [];
+  String? _selectedTemplate;
+
+  ResumeProvider({
+    required AnalyticsService analyticsService,
+    required StorageService storageService,
+    required ApiService apiService,
+  })  : _analyticsService = analyticsService,
+        _storageService = storageService,
+        _apiService = apiService;
 
   // Getters
-  ResumeModel? get currentResume => _currentResume;
-  PersonalInfo get personalInfo => _personalInfo;
-  ProfessionalInfo get professionalInfo => _professionalInfo;
-  List<Skill> get skills => _skills;
-  List<Education> get education => _education;
-  ResumeTemplate? get selectedTemplate => _selectedTemplate;
+  List<Resume> get resumes => _resumes;
+  List<ResumeTemplate> get templates => _templates;
+  Resume? get currentResume => _currentResume;
   bool get isLoading => _isLoading;
-  String? get errorMessage => _errorMessage;
-  List<ResumeModel> get savedResumes => _savedResumes;
-  List<AISuggestion> get currentSuggestions => _currentSuggestions;
+  String? get error => _error;
 
-  ResumeProvider() {
-    _loadSavedResumes();
-  }
+  // Resume building getters
+  Map<String, dynamic> get personalInfo => _personalInfo;
+  Map<String, dynamic> get professionalInfo => _professionalInfo;
+  Map<String, dynamic> get education => _education;
+  List<String> get skills => _skills;
+  String? get selectedTemplate => _selectedTemplate;
 
-  void _setLoading(bool loading) {
-    _isLoading = loading;
+  // Update methods for resume building
+  void updatePersonalInfo(Map<String, dynamic> info) {
+    _personalInfo = Map.from(info);
     notifyListeners();
   }
 
-  void _setError(String? error) {
-    _errorMessage = error;
+  void updateProfessionalInfo(Map<String, dynamic> info) {
+    _professionalInfo = Map.from(info);
     notifyListeners();
   }
 
-  // Load existing resume for editing
-  void loadExistingResume(ResumeModel resume) {
-    _currentResume = resume;
-    _personalInfo = resume.personalInfo;
-    _professionalInfo = resume.professionalInfo;
-    _skills = List.from(resume.skills);
-    _education = List.from(resume.education);
-    _selectedTemplate = resume.template;
+  void updateEducation(Map<String, dynamic> info) {
+    _education = Map.from(info);
     notifyListeners();
   }
 
-  // Update methods
-  void updatePersonalInfo(PersonalInfo info) {
-    _personalInfo = info;
+  void updateSkills(List<String> skillsList) {
+    _skills = List.from(skillsList);
     notifyListeners();
   }
 
-  void updateProfessionalInfo(ProfessionalInfo info) {
-    _professionalInfo = info;
-    notifyListeners();
-  }
-
-  void updateSkills(List<Skill> skills) {
-    _skills = skills;
-    notifyListeners();
-  }
-
-  void updateEducation(List<Education> education) {
-    _education = education;
-    notifyListeners();
-  }
-
-  void updateTemplate(ResumeTemplate template) {
-    _selectedTemplate = template;
+  void updateTemplate(String templateId) {
+    _selectedTemplate = templateId;
     notifyListeners();
   }
 
   // Validation methods
   bool validatePersonalInfo() {
-    return _personalInfo.fullName.isNotEmpty &&
-        _personalInfo.email.isNotEmpty &&
-        _personalInfo.phone.isNotEmpty;
+    return _personalInfo['fullName'] != null &&
+        _personalInfo['fullName'].toString().isNotEmpty &&
+        _personalInfo['email'] != null &&
+        _personalInfo['email'].toString().isNotEmpty;
   }
 
   bool validateProfessionalInfo() {
-    return _professionalInfo.summary.isNotEmpty &&
-        _professionalInfo.workExperience.isNotEmpty;
+    return _professionalInfo['jobTitle'] != null &&
+        _professionalInfo['jobTitle'].toString().isNotEmpty;
   }
 
   bool validateSkills() {
@@ -105,371 +93,416 @@ class ResumeProvider extends ChangeNotifier {
   }
 
   bool validateEducation() {
-    return _education.isNotEmpty;
+    // Education is optional, so always return true
+    return true;
   }
 
-  // AI Suggestions
-  Future<List<AISuggestion>> generateAISuggestions(int stepIndex) async {
-    try {
-      _setLoading(true);
-
-      List<AISuggestion> suggestions = [];
-
-      switch (stepIndex) {
-        case 0: // Personal Info
-          suggestions = await _aiService.generatePersonalInfoSuggestions(_personalInfo);
-          break;
-        case 1: // Professional
-          suggestions = await _aiService.generateProfessionalSuggestions(_professionalInfo);
-          break;
-        case 2: // Skills
-          suggestions = await _aiService.generateSkillsSuggestions(_skills, _professionalInfo);
-          break;
-        case 3: // Education
-          suggestions = await _aiService.generateEducationSuggestions(_education);
-          break;
-      }
-
-      _currentSuggestions = suggestions;
-      _setLoading(false);
-      return suggestions;
-    } catch (e) {
-      _setError('Failed to generate AI suggestions: $e');
-      _setLoading(false);
-      return [];
+  // Generate resume
+  Future<Resume?> generateResume() async {
+    if (!validatePersonalInfo() || !validateProfessionalInfo() || !validateSkills()) {
+      _setError('Please fill in all required fields');
+      return null;
     }
-  }
 
-  void applySuggestion(AISuggestion suggestion) {
-    switch (suggestion.type) {
-      case SuggestionType.summary:
-        _professionalInfo = _professionalInfo.copyWith(summary: suggestion.content);
-        break;
-      case SuggestionType.skill:
-        _skills.add(Skill(
-          id: const Uuid().v4(),
-          name: suggestion.content,
-          level: SkillLevel.intermediate,
-          category: SkillCategory.technical,
-        ));
-        break;
-      case SuggestionType.achievement:
-      // Add to work experience achievements
-        if (_professionalInfo.workExperience.isNotEmpty) {
-          final lastJob = _professionalInfo.workExperience.last;
-          final updatedAchievements = List<String>.from(lastJob.achievements)
-            ..add(suggestion.content);
-          final updatedJob = lastJob.copyWith(achievements: updatedAchievements);
-          final updatedExperience = List<WorkExperience>.from(_professionalInfo.workExperience)
-            ..removeLast()
-            ..add(updatedJob);
-          _professionalInfo = _professionalInfo.copyWith(workExperience: updatedExperience);
-        }
-        break;
-      case SuggestionType.education:
-      // Apply education suggestions
-        break;
-    }
-    notifyListeners();
+    _setLoading(true);
+    _setError(null);
 
-    AnalyticsService.instance.logEvent('ai_suggestion_applied', parameters: {
-      'suggestion_type': suggestion.type.toString(),
-    });
-  }
-
-  // Resume Generation
-  Future<void> generateResume() async {
     try {
-      _setLoading(true);
-      _setError(null);
+      final resumeData = {
+        'personalInfo': _personalInfo,
+        'professionalInfo': _professionalInfo,
+        'education': _education,
+        'skills': _skills,
+        'templateId': _selectedTemplate ?? 'modern',
+      };
 
-      if (_selectedTemplate == null) {
-        throw Exception('No template selected');
-      }
+      final response = await _apiService.post('/resumes/generate', body: resumeData);
+      final newResume = Resume.fromJson(response['resume']);
 
-      // Build resume model
-      final resume = buildResumeModel();
+      _resumes.add(newResume);
+      _currentResume = newResume;
 
-      // Generate AI-enhanced content
-      final enhancedResume = await _aiService.enhanceResume(resume);
-
-      // Calculate ATS score
-      final atsScore = await _aiService.calculateATSScore(enhancedResume);
-
-      _currentResume = enhancedResume.copyWith(atsScore: atsScore);
-
-      // Save to storage
-      await _saveResume(_currentResume!);
-
-      AnalyticsService.instance.logEvent('resume_generated', parameters: {
-        'template': _selectedTemplate!.name,
-        'ats_score': atsScore,
+      await _analyticsService.logEvent('resume_generated', parameters: {
+        'template_id': _selectedTemplate,
+        'skills_count': _skills.length,
       });
 
-      _setLoading(false);
+      notifyListeners();
+      return newResume;
     } catch (e) {
       _setError('Failed to generate resume: $e');
+      return null;
+    } finally {
       _setLoading(false);
-      rethrow;
     }
   }
 
-  ResumeModel buildResumeModel() {
-    return ResumeModel(
-      id: _currentResume?.id ?? const Uuid().v4(),
-      personalInfo: _personalInfo,
-      professionalInfo: _professionalInfo,
-      skills: _skills,
-      education: _education,
-      template: _selectedTemplate!,
-      createdAt: _currentResume?.createdAt ?? DateTime.now(),
-      updatedAt: DateTime.now(),
-      sections: _buildSections(),
-      keywords: _extractKeywords(),
-      atsScore: 0, // Will be calculated during generation
-    );
-  }
+  // Load user's resumes
+  Future<void> loadResumes() async {
+    _setLoading(true);
+    _setError(null);
 
-  List<ResumeSection> _buildSections() {
-    final sections = <ResumeSection>[];
-
-    // Header section
-    sections.add(ResumeSection(
-      id: 'header',
-      type: SectionType.header,
-      title: 'Header',
-      content: _personalInfo.toJson(),
-      order: 0,
-    ));
-
-    // Summary section
-    if (_professionalInfo.summary.isNotEmpty) {
-      sections.add(ResumeSection(
-        id: 'summary',
-        type: SectionType.summary,
-        title: 'Professional Summary',
-        content: {'summary': _professionalInfo.summary},
-        order: 1,
-      ));
-    }
-
-    // Experience section
-    if (_professionalInfo.workExperience.isNotEmpty) {
-      sections.add(ResumeSection(
-        id: 'experience',
-        type: SectionType.experience,
-        title: 'Work Experience',
-        content: {
-          'experiences': _professionalInfo.workExperience.map((e) => e.toJson()).toList(),
-        },
-        order: 2,
-      ));
-    }
-
-    // Skills section
-    if (_skills.isNotEmpty) {
-      sections.add(ResumeSection(
-        id: 'skills',
-        type: SectionType.skills,
-        title: 'Skills',
-        content: {
-          'skills': _skills.map((s) => s.toJson()).toList(),
-        },
-        order: 3,
-      ));
-    }
-
-    // Education section
-    if (_education.isNotEmpty) {
-      sections.add(ResumeSection(
-        id: 'education',
-        type: SectionType.education,
-        title: 'Education',
-        content: {
-          'education': _education.map((e) => e.toJson()).toList(),
-        },
-        order: 4,
-      ));
-    }
-
-    return sections;
-  }
-
-  List<String> _extractKeywords() {
-    final keywords = <String>[];
-
-    // Extract from skills
-    keywords.addAll(_skills.map((skill) => skill.name));
-
-    // Extract from work experience
-    for (final experience in _professionalInfo.workExperience) {
-      keywords.addAll(experience.responsibilities);
-      keywords.addAll(experience.achievements);
-    }
-
-    // Extract from summary
-    final summaryWords = _professionalInfo.summary
-        .split(RegExp(r'[^\w]+'))
-        .where((word) => word.length > 3)
-        .toList();
-    keywords.addAll(summaryWords);
-
-    return keywords.toSet().toList(); // Remove duplicates
-  }
-
-  // Save and Load
-  Future<void> saveDraft() async {
     try {
-      final resume = buildResumeModel();
-      await _saveResume(resume);
+      final response = await _apiService.get('/resumes');
+      _resumes = (response['resumes'] as List)
+          .map((resumeData) => Resume.fromJson(resumeData))
+          .toList();
 
-      AnalyticsService.instance.logEvent('resume_draft_saved');
-    } catch (e) {
-      _setError('Failed to save draft: $e');
-    }
-  }
+      await _analyticsService.logEvent('resumes_loaded', parameters: {
+        'count': _resumes.length,
+      });
 
-  Future<void> _saveResume(ResumeModel resume) async {
-    await _storageService.saveResume(resume);
-    await _loadSavedResumes(); // Refresh the list
-  }
-
-  Future<void> _loadSavedResumes() async {
-    try {
-      _savedResumes = await _storageService.getSavedResumes();
       notifyListeners();
     } catch (e) {
-      debugPrint('Failed to load saved resumes: $e');
+      _setError('Failed to load resumes: $e');
+    } finally {
+      _setLoading(false);
     }
   }
 
+  // Load available templates
+  Future<void> loadTemplates() async {
+    _setLoading(true);
+    _setError(null);
+
+    try {
+      final response = await _apiService.get('/templates');
+      _templates = (response['templates'] as List)
+          .map((templateData) => ResumeTemplate.fromJson(templateData))
+          .toList();
+
+      await _analyticsService.logEvent('templates_loaded', parameters: {
+        'count': _templates.length,
+      });
+
+      notifyListeners();
+    } catch (e) {
+      _setError('Failed to load templates: $e');
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  // Create new resume
+  Future<Resume?> createResume({
+    required String name,
+    required String templateId,
+    Map<String, dynamic>? initialData,
+  }) async {
+    _setLoading(true);
+    _setError(null);
+
+    try {
+      final requestData = {
+        'name': name,
+        'templateId': templateId,
+        if (initialData != null) 'initialData': initialData,
+      };
+
+      final response = await _apiService.post('/resumes', body: requestData);
+      final newResume = Resume.fromJson(response['resume']);
+
+      _resumes.add(newResume);
+      _currentResume = newResume;
+
+      // Save locally
+      await _saveResumeLocally(newResume);
+
+      await _analyticsService.logResumeCreated(templateId);
+      await _analyticsService.logEvent('resume_created', parameters: {
+        'template_id': templateId,
+        'resume_id': newResume.id,
+      });
+
+      notifyListeners();
+      return newResume;
+    } catch (e) {
+      _setError('Failed to create resume: $e');
+      return null;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  // Update resume
+  Future<void> updateResume(Resume resume) async {
+    _setLoading(true);
+    _setError(null);
+
+    try {
+      final response = await _apiService.put('/resumes/${resume.id}', body: resume.toJson());
+      final updatedResume = Resume.fromJson(response['resume']);
+
+      final index = _resumes.indexWhere((r) => r.id == resume.id);
+      if (index != -1) {
+        _resumes[index] = updatedResume;
+      }
+
+      if (_currentResume?.id == resume.id) {
+        _currentResume = updatedResume;
+      }
+
+      // Save locally
+      await _saveResumeLocally(updatedResume);
+
+      await _analyticsService.logEvent('resume_updated', parameters: {
+        'resume_id': resume.id,
+        'ats_score': updatedResume.atsScore,
+      });
+
+      notifyListeners();
+    } catch (e) {
+      _setError('Failed to update resume: $e');
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  // Delete resume
   Future<void> deleteResume(String resumeId) async {
-    try {
-      await _storageService.deleteResume(resumeId);
-      _savedResumes.removeWhere((resume) => resume.id == resumeId);
-      notifyListeners();
+    _setLoading(true);
+    _setError(null);
 
-      AnalyticsService.instance.logEvent('resume_deleted');
+    try {
+      await _apiService.delete('/resumes/$resumeId');
+
+      _resumes.removeWhere((r) => r.id == resumeId);
+
+      if (_currentResume?.id == resumeId) {
+        _currentResume = null;
+      }
+
+      // Remove from local storage
+      await _storageService.remove('resume_$resumeId');
+
+      await _analyticsService.logEvent('resume_deleted', parameters: {
+        'resume_id': resumeId,
+      });
+
+      notifyListeners();
     } catch (e) {
       _setError('Failed to delete resume: $e');
+    } finally {
+      _setLoading(false);
     }
   }
 
-  Future<void> duplicateResume(ResumeModel resume) async {
+  // Generate AI suggestions
+  Future<List<ResumeSuggestion>> generateSuggestions({
+    required String resumeId,
+    String? jobDescription,
+  }) async {
     try {
-      final duplicated = resume.copyWith(
-        id: const Uuid().v4(),
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
+      final requestData = {
+        'resumeId': resumeId,
+        if (jobDescription != null) 'jobDescription': jobDescription,
+      };
+
+      final response = await _apiService.post('/resumes/$resumeId/suggestions', body: requestData);
+      final suggestions = (response['suggestions'] as List)
+          .map((suggestionData) => ResumeSuggestion.fromJson(suggestionData))
+          .toList();
+
+      await _analyticsService.logEvent('suggestions_generated', parameters: {
+        'resume_id': resumeId,
+        'suggestion_count': suggestions.length,
+        'has_job_description': jobDescription != null,
+      });
+
+      return suggestions;
+    } catch (e) {
+      await _analyticsService.logError('Failed to generate suggestions: $e');
+      throw Exception('Failed to generate suggestions: $e');
+    }
+  }
+
+  // Generate AI suggestions with different method name
+  Future<List<ResumeSuggestion>> generateAISuggestions({
+    required String resumeId,
+    String? jobDescription,
+  }) async {
+    return generateSuggestions(resumeId: resumeId, jobDescription: jobDescription);
+  }
+
+  // Apply suggestion
+  Future<void> applySuggestion(String resumeId, ResumeSuggestion suggestion) async {
+    try {
+      final response = await _apiService.post(
+        '/resumes/$resumeId/suggestions/${suggestion.id}/apply',
       );
 
-      await _saveResume(duplicated);
+      final updatedResume = Resume.fromJson(response['resume']);
+      final index = _resumes.indexWhere((r) => r.id == resumeId);
+      if (index != -1) {
+        _resumes[index] = updatedResume;
+      }
 
-      AnalyticsService.instance.logEvent('resume_duplicated');
+      if (_currentResume?.id == resumeId) {
+        _currentResume = updatedResume;
+      }
+
+      await _analyticsService.logEvent('suggestion_applied', parameters: {
+        'resume_id': resumeId,
+        'suggestion_id': suggestion.id,
+        'suggestion_type': suggestion.type.toString().split('.').last,
+      });
+
+      notifyListeners();
     } catch (e) {
-      _setError('Failed to duplicate resume: $e');
+      await _analyticsService.logError('Failed to apply suggestion: $e');
+      throw Exception('Failed to apply suggestion: $e');
     }
   }
 
-  // Export functionality
-  Future<String> exportToPDF(ResumeModel resume) async {
+  // Build resume model from current data
+  Map<String, dynamic> buildResumeModel() {
+    return {
+      'personalInfo': _personalInfo,
+      'professionalInfo': _professionalInfo,
+      'education': _education,
+      'skills': _skills,
+      'templateId': _selectedTemplate ?? 'modern',
+      'createdAt': DateTime.now().toIso8601String(),
+    };
+  }
+
+  // Save draft
+  Future<void> saveDraft() async {
     try {
-      _setLoading(true);
+      final draftData = buildResumeModel();
+      await _storageService.setJson('resume_draft', draftData);
 
-      final pdfPath = await _storageService.exportResumeToPDF(resume);
-
-      AnalyticsService.instance.logEvent('resume_exported_pdf');
-
-      _setLoading(false);
-      return pdfPath;
+      await _analyticsService.logEvent('resume_draft_saved');
     } catch (e) {
-      _setError('Failed to export PDF: $e');
-      _setLoading(false);
-      rethrow;
+      if (kDebugMode) {
+        print('Failed to save draft: $e');
+      }
     }
   }
 
-  Future<String> exportToWord(ResumeModel resume) async {
+  // Load draft
+  Future<void> loadDraft() async {
     try {
-      _setLoading(true);
+      final draftData = _storageService.getJson('resume_draft');
+      if (draftData != null) {
+        _personalInfo = Map<String, dynamic>.from(draftData['personalInfo'] ?? {});
+        _professionalInfo = Map<String, dynamic>.from(draftData['professionalInfo'] ?? {});
+        _education = Map<String, dynamic>.from(draftData['education'] ?? {});
+        _skills = List<String>.from(draftData['skills'] ?? []);
+        _selectedTemplate = draftData['templateId'] as String?;
 
-      final docPath = await _storageService.exportResumeToWord(resume);
+        notifyListeners();
 
-      AnalyticsService.instance.logEvent('resume_exported_word');
-
-      _setLoading(false);
-      return docPath;
+        await _analyticsService.logEvent('resume_draft_loaded');
+      }
     } catch (e) {
-      _setError('Failed to export Word document: $e');
-      _setLoading(false);
-      rethrow;
+      if (kDebugMode) {
+        print('Failed to load draft: $e');
+      }
     }
   }
 
-  // Clear form data
-  void clearForm() {
-    _personalInfo = PersonalInfo.empty();
-    _professionalInfo = ProfessionalInfo.empty();
-    _skills.clear();
+  // Clear current resume data
+  void clearResumeData() {
+    _personalInfo.clear();
+    _professionalInfo.clear();
     _education.clear();
+    _skills.clear();
     _selectedTemplate = null;
-    _currentResume = null;
-    _currentSuggestions.clear();
     notifyListeners();
   }
 
-  void clearError() {
-    _setError(null);
-  }
+  // Set current resume
+  void setCurrentResume(Resume? resume) {
+    _currentResume = resume;
+    notifyListeners();
 
-  // Get template suggestions based on industry/role
-  Future<List<ResumeTemplate>> getTemplateRecommendations() async {
-    try {
-      final industry = _professionalInfo.industry;
-      final jobTitle = _professionalInfo.targetJobTitle;
-
-      return await _aiService.getTemplateRecommendations(
-        industry: industry,
-        jobTitle: jobTitle,
-      );
-    } catch (e) {
-      debugPrint('Failed to get template recommendations: $e');
-      return [];
+    if (resume != null) {
+      _analyticsService.logEvent('resume_selected', parameters: {
+        'resume_id': resume.id,
+        'template_id': resume.templateId,
+      });
     }
   }
 
-  // Analytics and insights
-  Future<ResumeAnalytics> getResumeAnalytics(ResumeModel resume) async {
+  // Save resume locally
+  Future<void> _saveResumeLocally(Resume resume) async {
     try {
-      return await _aiService.analyzeResume(resume);
+      await _storageService.saveResumeData(resume.id, resume.toJson());
     } catch (e) {
-      debugPrint('Failed to get resume analytics: $e');
-      return ResumeAnalytics.empty();
+      if (kDebugMode) {
+        print('Failed to save resume locally: $e');
+      }
     }
   }
 
-  // Smart suggestions based on job posting
-  Future<List<AISuggestion>> analyzeJobPosting(String jobPosting) async {
+  // Load resume from local storage
+  Future<Resume?> loadResumeFromLocal(String resumeId) async {
     try {
-      _setLoading(true);
-
-      final suggestions = await _aiService.analyzeJobPostingForResume(
-        jobPosting,
-        buildResumeModel(),
-      );
-
-      _setLoading(false);
-      return suggestions;
+      final resumeData = _storageService.getResumeData(resumeId);
+      if (resumeData != null) {
+        return Resume.fromJson(resumeData);
+      }
     } catch (e) {
-      _setError('Failed to analyze job posting: $e');
-      _setLoading(false);
-      return [];
+      if (kDebugMode) {
+        print('Failed to load resume from local storage: $e');
+      }
+    }
+    return null;
+  }
+
+  // Clear all data
+  void clearData() {
+    _resumes.clear();
+    _templates.clear();
+    _currentResume = null;
+    _error = null;
+    _isLoading = false;
+    clearResumeData();
+    notifyListeners();
+  }
+
+  // Helper methods
+  void _setLoading(bool loading) {
+    _isLoading = loading;
+    notifyListeners();
+  }
+
+  void _setError(String? error) {
+    _error = error;
+    notifyListeners();
+  }
+
+  // Get resume by ID
+  Resume? getResumeById(String id) {
+    try {
+      return _resumes.firstWhere((resume) => resume.id == id);
+    } catch (e) {
+      return null;
     }
   }
 
-  @override
-  void dispose() {
-    // Clean up resources
-    super.dispose();
+  // Get template by ID
+  ResumeTemplate? getTemplateById(String id) {
+    try {
+      return _templates.firstWhere((template) => template.id == id);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Filter templates by category
+  List<ResumeTemplate> getTemplatesByCategory(TemplateCategory category) {
+    return _templates.where((template) => template.category == category).toList();
+  }
+
+  // Get premium templates
+  List<ResumeTemplate> getPremiumTemplates() {
+    return _templates.where((template) => template.isPremium).toList();
+  }
+
+  // Get free templates
+  List<ResumeTemplate> getFreeTemplates() {
+    return _templates.where((template) => !template.isPremium).toList();
   }
 }
