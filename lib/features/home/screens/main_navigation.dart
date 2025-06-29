@@ -6,7 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/providers/subscription_provider.dart';
 import '../../../core/services/analytics_service.dart';
-import '../../../core/widgets/animated_bottom_nav_bar.dart';
+ import '../../../services/analytics_service.dart';
 import '../../home/screens/home_screen.dart';
 import '../../resume/screens/resume_list_screen.dart';
 import '../../interview/screens/interview_hub_screen.dart';
@@ -342,7 +342,10 @@ class _AIAssistantBottomSheetState extends State<AIAssistantBottomSheet>
     return SlideTransition(
       position: _slideAnimation,
       child: Container(
-        height: MediaQuery.of(context).size.height * 0.85,
+        height: MediaQuery
+            .of(context)
+            .size
+            .height * 0.85,
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(
@@ -636,7 +639,9 @@ class _AIAssistantBottomSheetState extends State<AIAssistantBottomSheet>
   }
 
   void _sendMessage() {
-    if (_queryController.text.trim().isEmpty || _isLoading) return;
+    if (_queryController.text
+        .trim()
+        .isEmpty || _isLoading) return;
 
     final message = _queryController.text.trim();
     _queryController.clear();
@@ -673,4 +678,4 @@ class _AIAssistantBottomSheetState extends State<AIAssistantBottomSheet>
       ),
     );
   }
-}``yaml
+}

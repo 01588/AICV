@@ -2,10 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/services/ai_service.dart';
-import '../../../core/services/analytics_service.dart';
-import '../../../core/services/storage_service.dart';
+
 import '../models/resume_model.dart';
-import '../models/template_model.dart';
 
 class ResumeProvider extends ChangeNotifier {
   final AIService _aiService = AIService.instance;

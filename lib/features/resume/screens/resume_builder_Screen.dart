@@ -3,16 +3,11 @@ import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../../../core/widgets/custom_app_bar.dart';
-import '../../../core/widgets/gradient_background.dart';
-import '../../../core/widgets/step_indicator.dart';
-import '../../../core/widgets/ai_suggestion_card.dart';
+
+import '../../../core/widgets/custom_widgets.dart';
 import '../providers/resume_provider.dart';
 import '../models/resume_model.dart';
-import '../widgets/resume_form_sections.dart';
-import '../widgets/template_selector.dart';
-import '../widgets/ai_writing_assistant.dart';
-import 'resume_preview_screen.dart';
+
 
 class ResumeBuilderScreen extends StatefulWidget {
   final ResumeModel? existingResume;
@@ -53,7 +48,7 @@ class _ResumeBuilderScreenState extends State<ResumeBuilderScreen>
     ),
     ResumeStep(
       title: 'Education',
-      icon: Icons.school_outline,
+      icon: Icons.school_outlined,
       description: 'Academic background and certifications',
     ),
     ResumeStep(
